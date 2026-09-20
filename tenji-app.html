@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>点字マナビ — Japanese Braille</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FFFFFF;
+    --paper-dark:#F2F2F2;
+    --ink:#22304A;
+    --ink-soft:#5B6B85;
+    --indigo:#2B4570;
+    --indigo-deep:#1B2C46;
+    --shu:#C1440E;
+    --shu-soft:#F5E1D8;
+    --ao:#3468A6;
+    --ao-soft:#E4EDF6;
+    --gold:#C9A227;
+    --green:#3E9C5C;
+    --green-soft:#E4F5E9;
+    --purple:#7A4FBE;
+    --purple-soft:#EDE5F8;
+    --card:#FFFFFF;
+    --line:#E9E9E9;
+    --radius:18px;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#161B26; --paper-dark:#10141C; --ink:#EDEFF5; --ink-soft:#9AA5BD;
+      --card:#1E2432; --line:#2B3245; --shu-soft:#3A2620; --ao-soft:#1E2C40; --green-soft:#173626; --purple-soft:#241C33;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#161B26; --paper-dark:#10141C; --ink:#EDEFF5; --ink-soft:#9AA5BD;
+    --card:#1E2432; --line:#2B3245; --shu-soft:#3A2620; --ao-soft:#1E2C40; --green-soft:#173626; --purple-soft:#241C33;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Inter',sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    -webkit-tap-highlight-color:transparent;
+  }
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  .kana{font-family:'Zen Maru Gothic',sans-serif;}
+  #app{max-width:480px;margin:0 auto;min-height:100%;position:relative;display:flex;flex-direction:column;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:20; background:var(--paper);
+    padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;
+    display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--line);
+  }
+  .topbar .stat{display:flex; align-items:center; gap:5px; font-weight:800; font-size:14px;}
+  .topbar .tagline{font-size:12.5px; font-weight:800; color:var(--ink-soft); line-height:1.35;}
+  .confirm-sheet{background:var(--paper); border-radius:20px; padding:22px 20px 18px; max-width:320px; width:100%; text-align:center;}
+  .confirm-sheet p{margin:0 0 18px; font-size:14.5px; font-weight:700; line-height:1.6;}
+  .confirm-btns{display:flex; gap:10px;}
+  .topbar .spacer{flex:1;}
+  .admin-toggle{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--ink-soft);background:var(--card);border:1px solid var(--line);padding:5px 8px;border-radius:999px;cursor:pointer;user-select:none;}
+  .admin-toggle .dot{width:9px;height:9px;border-radius:50%;background:#c8c8c8;}
+  .admin-toggle.on{color:var(--shu);border-color:var(--shu);}
+  .admin-toggle.on .dot{background:var(--shu);}
+
+  /* ---------- screens ---------- */
+  .screen{flex:1; display:flex; flex-direction:column; padding-bottom:40px;}
+  .hidden{display:none !important;}
+
+  /* ---------- path / home ---------- */
+  .path-wrap{padding:24px 16px 60px; display:flex; flex-direction:column; align-items:center; gap:0;}
+  .chapter-block{width:100%; max-width:380px; margin-bottom:6px;}
+  .chapter-head{margin:34px 0 22px;}
+  .chapter-rule{height:3px; border-radius:3px; background:var(--ao); margin-bottom:10px;}
+  .chapter-head .row{display:flex; align-items:flex-end; justify-content:space-between; gap:10px;}
+  .chapter-head .num{font-size:10.5px; font-weight:800; letter-spacing:.16em; color:var(--ao); text-transform:uppercase;}
+  .chapter-head .name{font-size:17.5px; font-weight:800; margin-top:4px; color:var(--ink);}
+  .chapter-head .name .kana{font-size:19px;}
+  .chapter-head .ch-state{font-size:15px; opacity:.55;}
+  .chapter-block.todo .chapter-rule{background:var(--line);}
+  .chapter-block.todo .num,
+  .chapter-block.todo .name{color:var(--ink-soft);}
+  .chapter-block.locked-ch{filter:grayscale(1); opacity:.42;}
+  .exam-row.locked-ex{filter:grayscale(1); opacity:.45;}
+
+  /* ---------- braille chart card ---------- */
+  .chart-card{width:100%; max-width:380px; display:flex; align-items:center; gap:13px; background:var(--card);
+    border:1px solid var(--line); border-radius:16px; padding:12px 14px; cursor:pointer; margin:0 0 6px;}
+  .chart-card:active{background:var(--paper-dark);}
+  .chart-card .mini{display:grid; grid-template-columns:repeat(2,8px); grid-template-rows:repeat(3,8px); gap:3px;}
+  .chart-card .mini i{display:block; border-radius:50%; background:var(--line);}
+  .chart-card .mini i.on{background:var(--ink);}
+  .chart-card .cc-title{font-size:13.5px; font-weight:800;}
+  .chart-card .cc-sub{font-size:11px; color:var(--ink-soft); font-weight:700; margin-top:1px;}
+  .chart-card .cc-go{margin-left:auto; color:var(--ink-soft); font-size:18px;}
+
+  .chart-legend{display:flex; gap:16px; font-size:11px; color:var(--ink-soft); font-weight:700; margin-bottom:14px;}
+  .chart-legend span{display:flex; align-items:center; gap:6px;}
+  .chart-legend b{width:10px; height:10px; border-radius:50%; background:var(--ink); display:block;}
+  .chart-legend b.faded{opacity:.3;}
+  .chart-group{margin-bottom:18px;}
+  .chart-group h4{margin:0 0 9px; font-size:11.5px; font-weight:800; color:var(--ink-soft); letter-spacing:.1em;
+    display:flex; align-items:center; gap:9px;}
+  .chart-group h4:after{content:''; flex:1; height:1px; background:var(--line);}
+  .chart-row{display:grid; grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:6px;}
+  .chart-cell{display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 2px;
+    border-radius:11px; background:var(--card); border:1px solid var(--line);}
+  .chart-cell.dim{opacity:.3;}
+  .chart-cell .cell{grid-template-columns:repeat(2,9px); grid-template-rows:repeat(3,9px); gap:3px; padding:2px;}
+  .chart-cell .dotcell{border-width:1.5px;}
+  .chart-cell .k{font-size:16px; font-weight:700; margin-top:2px;}
+  .chart-cell .r{font-size:9.5px; color:var(--ink-soft); font-weight:700; text-transform:uppercase;}
+  .node-row{display:flex; justify-content:center; gap:34px; margin-bottom:30px;}
+  .node{
+    width:78px; display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;
+  }
+  .node-circle{
+    width:72px; height:72px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:26px; position:relative; background:var(--card);
+    border:5px solid var(--line); box-shadow:0 4px 0 rgba(0,0,0,.08);
+  }
+  .node-circle:active{transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.08);}
+  .node.locked .node-circle{border-color:var(--line); background:var(--paper-dark); cursor:not-allowed; opacity:.7;}
+  .node.locked{cursor:not-allowed;}
+  .node.wajib .node-circle{border-color:var(--green);}
+  .node.wajib.done .node-circle{background:var(--green); border-color:var(--green); color:#fff;}
+  .node.latihan .node-circle{border-color:var(--gold);}
+  .node.latihan.done .node-circle{background:var(--gold); border-color:var(--gold); color:#fff;}
+  .node-label{font-size:11.5px; font-weight:700; color:var(--ink-soft); text-align:center; line-height:1.2;}
+  .node-star{position:absolute; bottom:-6px; right:-6px; background:var(--gold); color:#fff; border-radius:999px; min-width:22px; height:22px; padding:0 5px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; box-shadow:0 1px 3px rgba(0,0,0,.25);}
+
+  .exam-row{display:flex; justify-content:center; margin:6px 0 34px;}
+  .exam-node{display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; width:120px;}
+  .exam-circle{
+    width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:34px; position:relative; background:var(--card); border:6px solid var(--purple);
+    box-shadow:0 4px 0 rgba(0,0,0,.08);
+  }
+  .exam-circle:active{transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.08);}
+  .exam-node.done .exam-circle{background:var(--purple); border-color:var(--purple); color:#fff;}
+  .exam-node.locked .exam-circle{border-color:var(--line); background:var(--paper-dark); opacity:.7; cursor:not-allowed;}
+  .exam-node.locked{cursor:not-allowed;}
+  .exam-label{font-size:12.5px; font-weight:800; text-align:center; color:var(--purple);}
+  .exam-node.locked .exam-label{color:var(--ink-soft);}
+  .exam-sub{font-size:10.5px; font-weight:600; color:var(--ink-soft); text-align:center;}
+
+  .basic-row{display:flex; justify-content:center; margin:4px 0 30px;}
+  .basic-node{display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; width:150px;}
+  .basic-circle{
+    width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:34px; background:var(--card); border:6px solid var(--ao); box-shadow:0 4px 0 rgba(0,0,0,.08);
+  }
+  .basic-circle:active{transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.08);}
+  .basic-node.done .basic-circle{background:var(--ao); border-color:var(--ao); color:#fff;}
+  .basic-label{font-size:12.5px; font-weight:800; text-align:center; color:var(--ao);}
+  .basic-sub{font-size:10.5px; font-weight:600; color:var(--ink-soft); text-align:center;}
+
+  /* ---------- basics lesson ---------- */
+  .lesson-wrap{flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; padding:26px 22px 20px;}
+  .lesson-dots{display:flex; gap:6px; margin-bottom:26px;}
+  .lesson-dots i{width:8px;height:8px;border-radius:50%;background:var(--line);display:block;}
+  .lesson-dots i.on{background:var(--ao); width:22px; border-radius:999px;}
+  .lesson-visual{display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; margin-bottom:24px; min-height:120px;}
+  .lesson-item{display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .lesson-cap{font-size:11.5px; font-weight:700; color:var(--ink-soft);}
+  .lesson-op{font-size:26px; font-weight:800; color:var(--ink-soft);}
+  .lesson-wrap h2{font-size:21px; margin:0 0 12px; font-weight:800;}
+  .lesson-wrap p{font-size:14.5px; line-height:1.7; color:var(--ink-soft); margin:0 0 10px; max-width:330px;}
+  .lesson-wrap .big-emoji{font-size:64px; margin-bottom:10px;}
+  .lesson-cta{width:100%; max-width:330px; margin-top:auto; padding-top:20px;}
+
+  .intro-card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin:6px 16px 0; }
+  .intro-card h1{font-size:20px; margin:0 0 6px; font-weight:800;}
+  .intro-card p{font-size:14px; color:var(--ink-soft); line-height:1.55; margin:0 0 10px;}
+  .legend{display:flex; gap:14px; font-size:12.5px; font-weight:700; margin-top:8px; flex-wrap:wrap;}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .legend i{width:12px;height:12px;border-radius:50%; display:inline-block;}
+
+  .mode-select{display:flex; gap:8px; margin-top:14px;}
+  .mode-btn{flex:1; border:2px solid var(--line); background:var(--card); border-radius:14px; padding:12px 8px; text-align:center; cursor:pointer;}
+  .mode-btn .mb-emoji{font-size:22px;}
+  .mode-btn .mb-label{font-size:12.5px; font-weight:800; margin-top:4px;}
+  .mode-btn .mb-sub{font-size:10.5px; color:var(--ink-soft); font-weight:600; margin-top:2px;}
+  .mode-btn.active{border-color:var(--indigo); background:var(--ao-soft);}
+
+  .special-badge{display:inline-flex; align-items:center; gap:4px; background:var(--gold); color:#fff; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; margin-left:6px;}
+  .note-box{background:var(--ao-soft); border:1px solid var(--ao); border-radius:14px; padding:12px 14px; font-size:12.5px; color:var(--ink); line-height:1.5; margin:0 16px 12px;}
+  .note-box b{color:var(--indigo);}
+
+  /* ---------- generic screen header ---------- */
+  .screen-head{display:flex; align-items:center; gap:12px; padding:calc(14px + env(safe-area-inset-top,0px)) 16px 14px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--paper); z-index:10;}
+  .back-btn{width:34px;height:34px;border-radius:50%; border:1px solid var(--line); background:var(--card); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; color:var(--ink);}
+  .screen-title{font-weight:800; font-size:15.5px;}
+  .screen-sub{font-size:12px; color:var(--ink-soft); font-weight:600;}
+  .progress-bar{flex:1;height:12px;background:var(--paper-dark);border-radius:999px;overflow:hidden;margin:0 4px;}
+  .progress-bar > div{height:100%;background:var(--green);border-radius:999px;transition:width .3s;}
+  .hearts{display:flex;gap:3px;font-size:16px;}
+
+  /* ---------- braille cell ---------- */
+  .cell{display:inline-grid; grid-template-columns:repeat(2, 22px); grid-template-rows:repeat(3, 22px); gap:6px; padding:8px;}
+  .cell.big{grid-template-columns:repeat(2, 30px); grid-template-rows:repeat(3, 30px); gap:8px; padding:10px;}
+  .dotcell{width:100%;height:100%;border-radius:50%; background:var(--paper-dark); border:2px solid var(--line);}
+  .dotcell.on-vowel{background:var(--ao); border-color:var(--ao);}
+  .dotcell.on-consonant{background:var(--shu); border-color:var(--shu);}
+  .dotcell.on-black{background:var(--ink); border-color:var(--ink);}
+  .cell-inline{display:inline-flex;}
+  .cell.numbered .dotcell{display:flex; align-items:center; justify-content:center;}
+  .cell.numbered .dotcell span{font-size:14px; font-weight:800; color:var(--ink-soft); opacity:0;
+    transform:scale(.3); animation:dotPop .5s cubic-bezier(.2,1.5,.4,1) forwards;}
+  @keyframes dotPop{to{opacity:1; transform:scale(1);}}
+
+  /* ---------- material step (wajib) ---------- */
+  .mat-step{flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; padding:22px 22px 0;}
+  .mat-step .step-kana{font-size:62px; font-weight:700; line-height:1.05; margin-top:14px;}
+  .mat-step .step-romaji{font-size:14px; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.1em;}
+  .dot-breakdown{display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top:18px;}
+  .db-item{display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; color:var(--ink-soft);}
+  .db-item i{width:11px; height:11px; border-radius:50%; display:block;}
+
+  /* ---------- material list (wajib) ---------- */
+  .material-list{padding:14px 16px; display:flex; flex-direction:column; gap:10px;}
+  .mat-row{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:14px;}
+  .mat-kana{font-size:30px; font-weight:700; width:44px; text-align:center;}
+  .mat-info{flex:1;}
+  .mat-romaji{font-size:13px; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em;}
+  .mat-desc{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .cta-row{padding:16px; position:sticky; bottom:0; background:linear-gradient(to top, var(--paper) 60%, transparent); }
+  .btn{
+    display:block; width:100%; text-align:center; padding:15px; border-radius:16px; border:none;
+    font-weight:800; font-size:15px; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.15);
+  }
+  .btn:active{transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.15);}
+  .btn-primary{background:var(--green); color:#fff;}
+  .btn-secondary{background:var(--card); color:var(--ink); border:1px solid var(--line); box-shadow:none;}
+  .btn-gold{background:var(--gold); color:#fff;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  .link-btn{background:none;border:none;color:var(--ao);font-weight:700;font-size:13px;cursor:pointer;text-decoration:underline;}
+
+  /* ---------- quiz ---------- */
+  .quiz-wrap{flex:1; display:flex; flex-direction:column; padding:22px 18px;}
+  .quiz-prompt{font-size:14px; font-weight:700; color:var(--ink-soft); margin-bottom:14px; text-align:center;}
+  .quiz-focus{display:flex; justify-content:center; margin-bottom:22px;}
+  .quiz-focus .big-kana{font-size:56px; font-weight:700;}
+  .braille-seq{display:flex; gap:4px; justify-content:center; flex-wrap:wrap; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:10px 16px;}
+  .options{display:flex; flex-direction:column; gap:10px; margin-top:auto;}
+  .opt-btn{
+    background:var(--card); border:2px solid var(--line); border-radius:14px; padding:14px; text-align:left;
+    font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:12px;
+  }
+  .opt-btn .cell{padding:4px;}
+  .opt-btn:active{background:var(--paper-dark);}
+  .opt-btn.correct{border-color:var(--green); background:var(--green-soft);}
+  .opt-btn.wrong{border-color:var(--shu); background:var(--shu-soft);}
+  .opt-sub{font-size:11.5px; color:var(--ink-soft); font-weight:600;}
+  .opt-main{display:flex; flex-direction:column; gap:1px; align-items:flex-start;}
+  .opt-kana{font-size:21px; font-weight:700; line-height:1.2;}
+  .opt-romaji{font-size:11.5px; font-weight:700; color:var(--ink-soft); letter-spacing:.05em;}
+  .opt-mean{font-size:11px; font-weight:600; font-style:italic; color:var(--ink-soft); margin-top:3px;}
+  .opt-mean.hide{display:none;}
+  .feedback-bar{position:sticky; bottom:0; padding:16px; margin:16px -18px -22px; }
+  .feedback-bar.ok{background:var(--green-soft);}
+  .feedback-bar.bad{background:var(--shu-soft);}
+  .feedback-bar .fb-title{font-weight:800; font-size:15px; margin-bottom:10px;}
+  .feedback-bar.ok .fb-title{color:var(--green);}
+  .feedback-bar.bad .fb-title{color:var(--shu);}
+
+  /* ---------- table modal ---------- */
+  .modal-overlay{position:fixed; inset:0; background:rgba(20,20,20,.5); z-index:50; display:flex; align-items:flex-end; justify-content:center;}
+  .modal-overlay.center{align-items:center; padding:20px;}
+  .modal-sheet{background:var(--paper); width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:18px; max-height:78vh; overflow-y:auto;}
+  .modal-overlay.center .modal-sheet{border-radius:20px; max-height:80vh;}
+  .modal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .modal-head h3{margin:0; font-size:16px; font-weight:800;}
+  .close-x{width:30px;height:30px;border-radius:50%;border:none;background:var(--paper-dark);font-size:15px;cursor:pointer;}
+  .table-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(72px,1fr)); gap:8px;}
+  .table-cell{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px 4px; display:flex; flex-direction:column; align-items:center; gap:2px;}
+  .table-cell .kana{font-size:19px; font-weight:700;}
+  .table-cell .romaji{font-size:10px; color:var(--ink-soft); font-weight:700; text-transform:uppercase;}
+
+  .center-screen{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px;}
+  .center-screen .emoji{font-size:64px; margin-bottom:14px;}
+  .center-screen h2{font-size:22px; margin:0 0 8px;}
+  .center-screen p{color:var(--ink-soft); font-size:14px; margin:0 0 22px; max-width:300px;}
+  .result-stats{display:flex; gap:24px; margin-bottom:24px;}
+  .result-stat{text-align:center;}
+  .result-stat .n{font-size:26px; font-weight:900;}
+  .result-stat .l{font-size:11px; color:var(--ink-soft); font-weight:700; text-transform:uppercase;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   DATA: Japanese braille (gojūon) dot patterns, verified.
+   Dot positions: 1,2,3 = left column top to bottom, 4,5,6 = right column.
+   Colour rule (required level): dots {1,2,4} = blue (vowel base),
+   dots {3,5,6} = red (consonant marker).
+   ============================================================ */
+const CHAPTERS = [
+  { id:1, kana:'あ行', romajiName:'A-gyō',
+    desc:{en:'The five basic vowels. Every other character is built on these.', jp:'基本の母音５つ。すべての文字の土台です。'},
+    special:true,
+    note:{en:'The shapes for あ, い and う look like the braille numbers 1, 2 and 3, but the resemblance stops there: え and お do not follow the number order.', jp:'あ・い・うの形は数字の１・２・３に似ていますが、似ているのはここまでです。え・おは数字の順とは違います。'},
+    chars:[
+      {k:'あ',r:'a',d:[1]},
+      {k:'い',r:'i',d:[1,2]},
+      {k:'う',r:'u',d:[1,4]},
+      {k:'え',r:'e',d:[1,2,4]},
+      {k:'お',r:'o',d:[2,4]},
+    ]},
+  { id:2, kana:'か行', romajiName:'Ka-gyō',
+    desc:{en:'Vowel + dot 6 (red) = the consonant "k".', jp:'母音＋６の点（赤）＝子音「か行」。'},
+    special:false,
+    note:{en:'The "k" consonant is marked by a single extra dot, dot 6. It is one of the simplest markers in the whole system.', jp:'か行の印は６の点ひとつだけ。もっとも簡単な子音の印のひとつです。'},
+    chars:[
+      {k:'か',r:'ka',d:[1,6]},
+      {k:'き',r:'ki',d:[1,2,6]},
+      {k:'く',r:'ku',d:[1,4,6]},
+      {k:'け',r:'ke',d:[1,2,4,6]},
+      {k:'こ',r:'ko',d:[2,4,6]},
+    ]},
+  { id:3, kana:'さ行', romajiName:'Sa-gyō',
+    desc:{en:'Vowel + dots 5 and 6 (red) = the consonant "s".', jp:'母音＋５・６の点（赤）＝子音「さ行」。'},
+    special:false,
+    note:{en:'The "s" consonant uses two dots, 5 and 6. Remember this pair: it comes back later as part of the ま行 pattern.', jp:'さ行は５と６の２点を使います。この組み合わせはあとでま行の形にも出てきます。'},
+    chars:[
+      {k:'さ',r:'sa',d:[1,5,6]},
+      {k:'し',r:'shi',d:[1,2,5,6]},
+      {k:'す',r:'su',d:[1,4,5,6]},
+      {k:'せ',r:'se',d:[1,2,4,5,6]},
+      {k:'そ',r:'so',d:[2,4,5,6]},
+    ]},
+  { id:4, kana:'た行', romajiName:'Ta-gyō',
+    desc:{en:'Vowel + dots 3 and 5 (red) = the consonant "t".', jp:'母音＋３・５の点（赤）＝子音「た行」。'},
+    special:false,
+    note:{en:'The "t" consonant uses dots 3 and 5.', jp:'た行は３と５の点を使います。'},
+    chars:[
+      {k:'た',r:'ta',d:[1,3,5]},
+      {k:'ち',r:'chi',d:[1,2,3,5]},
+      {k:'つ',r:'tsu',d:[1,3,4,5]},
+      {k:'て',r:'te',d:[1,2,3,4,5]},
+      {k:'と',r:'to',d:[2,3,4,5]},
+    ]},
+  { id:5, kana:'な行', romajiName:'Na-gyō',
+    desc:{en:'Vowel + dot 3 (red) = the consonant "n".', jp:'母音＋３の点（赤）＝子音「な行」。'},
+    special:true,
+    note:{en:'な行 is the simplest consonant marker of all: one extra dot, dot 3, on its own without dot 5 or dot 6.', jp:'な行はもっとも簡単な印です。３の点ひとつだけで、５や６の点は付きません。'},
+    chars:[
+      {k:'な',r:'na',d:[1,3]},
+      {k:'に',r:'ni',d:[1,2,3]},
+      {k:'ぬ',r:'nu',d:[1,3,4]},
+      {k:'ね',r:'ne',d:[1,2,3,4]},
+      {k:'の',r:'no',d:[2,3,4]},
+    ]},
+  { id:6, kana:'は行', romajiName:'Ha-gyō',
+    desc:{en:'Vowel + dots 3 and 6 (red) = the consonant "h".', jp:'母音＋３・６の点（赤）＝子音「は行」。'},
+    special:false,
+    note:{en:'The "h" consonant uses dots 3 and 6.', jp:'は行は３と６の点を使います。'},
+    chars:[
+      {k:'は',r:'ha',d:[1,3,6]},
+      {k:'ひ',r:'hi',d:[1,2,3,6]},
+      {k:'ふ',r:'fu',d:[1,3,4,6]},
+      {k:'へ',r:'he',d:[1,2,3,4,6]},
+      {k:'ほ',r:'ho',d:[2,3,4,6]},
+    ]},
+  { id:7, kana:'ま行', romajiName:'Ma-gyō',
+    desc:{en:'Vowel + dots 3, 5 and 6 (red) = the consonant "m". ん belongs here too.', jp:'母音＋３・５・６の点（赤）＝子音「ま行」。「ん」もここに入ります。'},
+    special:true,
+    note:{en:'ま行 uses all three consonant dots at once (3, 5, 6), the fullest combination in the system. ん is unusual: dots 3, 5 and 6 with no vowel dots at all, historically derived from む.', jp:'ま行は子音の点３つ（３・５・６）をすべて使います。「ん」は特別で、母音の点がなく３・５・６だけ。歴史的には「む」から生まれた形です。'},
+    chars:[
+      {k:'ま',r:'ma',d:[1,3,5,6]},
+      {k:'み',r:'mi',d:[1,2,3,5,6]},
+      {k:'む',r:'mu',d:[1,3,4,5,6]},
+      {k:'め',r:'me',d:[1,2,3,4,5,6]},
+      {k:'も',r:'mo',d:[2,3,4,5,6]},
+      {k:'ん',r:'n',d:[3,5,6]},
+    ]},
+  { id:8, kana:'や行', romajiName:'Ya-gyō',
+    desc:{en:'The semi-vowel "y": the vowel shape drops to the lower rows, plus dot 4 (red).', jp:'半母音「や行」。母音の形を下にずらし、４の点（赤）を足します。'},
+    special:true,
+    note:{en:'や行 does not follow the usual "vowel + consonant marker" rule. The vowel shape moves down inside the cell, then dot 4 is added. Dot 4 on its own, placed before a syllable, is also the yōon marker, as in きゃ kya.', jp:'や行は「母音＋子音の印」という普通の形ではありません。母音の形をマスの下にずらし、４の点を足します。４の点だけを前に置くと拗音の印になり、「きゃ」などを表します。'},
+    chars:[
+      {k:'や',r:'ya',d:[3,4]},
+      {k:'ゆ',r:'yu',d:[3,4,6]},
+      {k:'よ',r:'yo',d:[3,4,5]},
+    ]},
+  { id:9, kana:'ら行', romajiName:'Ra-gyō',
+    desc:{en:'Vowel + dot 5 (red) = the consonant "r".', jp:'母音＋５の点（赤）＝子音「ら行」。'},
+    special:false,
+    note:{en:'The "r" consonant uses just one extra dot, dot 5.', jp:'ら行は５の点ひとつだけです。'},
+    chars:[
+      {k:'ら',r:'ra',d:[1,5]},
+      {k:'り',r:'ri',d:[1,2,5]},
+      {k:'る',r:'ru',d:[1,4,5]},
+      {k:'れ',r:'re',d:[1,2,4,5]},
+      {k:'ろ',r:'ro',d:[2,4,5]},
+    ]},
+  { id:10, kana:'わ行', romajiName:'Wa-gyō',
+    desc:{en:'The vowel shape drops to the lower rows, with no consonant dot added.', jp:'母音の形を下にずらすだけ。子音の点は足しません。'},
+    special:true,
+    note:{en:'わ行 is the most unusual of all: no consonant dot is added at any point. The vowel shape is simply moved down into the lower part of the cell.', jp:'わ行がいちばん特別です。子音の点はまったく足さず、母音の形をマスの下にずらすだけです。'},
+    chars:[
+      {k:'わ',r:'wa',d:[3]},
+      {k:'ゐ',r:'wi',d:[2,3]},
+      {k:'ゑ',r:'we',d:[2,3,5]},
+      {k:'を',r:'wo',d:[3,5]},
+    ]},
+];
+
+const WORDS = {
+  1:[ {k:'あい',r:'ai',e:'love'}, {k:'いえ',r:'ie',e:'house'}, {k:'うえ',r:'ue',e:'above / up'}, {k:'あお',r:'ao',e:'blue'}, {k:'いいえ',r:'iie',e:'no'} ],
+  2:[ {k:'かお',r:'kao',e:'face'}, {k:'いか',r:'ika',e:'squid'}, {k:'かき',r:'kaki',e:'persimmon'}, {k:'きく',r:'kiku',e:'chrysanthemum'}, {k:'あか',r:'aka',e:'red'} ],
+  3:[ {k:'あさ',r:'asa',e:'morning'}, {k:'いす',r:'isu',e:'chair'}, {k:'かさ',r:'kasa',e:'umbrella'}, {k:'すし',r:'sushi',e:'sushi'}, {k:'せかい',r:'sekai',e:'world'} ],
+  4:[ {k:'たこ',r:'tako',e:'octopus'}, {k:'くつ',r:'kutsu',e:'shoes'}, {k:'した',r:'shita',e:'below / under'}, {k:'ちいさい',r:'chiisai',e:'small'}, {k:'とし',r:'toshi',e:'year / age'} ],
+  5:[ {k:'いぬ',r:'inu',e:'dog'}, {k:'ねこ',r:'neko',e:'cat'}, {k:'なつ',r:'natsu',e:'summer'}, {k:'あに',r:'ani',e:'older brother'}, {k:'きのこ',r:'kinoko',e:'mushroom'} ],
+  6:[ {k:'はな',r:'hana',e:'flower'}, {k:'ほし',r:'hoshi',e:'star'}, {k:'ひと',r:'hito',e:'person'}, {k:'ふね',r:'fune',e:'boat / ship'}, {k:'はは',r:'haha',e:'mother'} ],
+  7:[ {k:'あめ',r:'ame',e:'rain'}, {k:'みみ',r:'mimi',e:'ear'}, {k:'くも',r:'kumo',e:'cloud'}, {k:'みかん',r:'mikan',e:'mandarin orange'}, {k:'ほん',r:'hon',e:'book'} ],
+  8:[ {k:'やま',r:'yama',e:'mountain'}, {k:'やさい',r:'yasai',e:'vegetable'}, {k:'ゆか',r:'yuka',e:'floor'}, {k:'よこ',r:'yoko',e:'side'} ],
+  9:[ {k:'さくら',r:'sakura',e:'cherry blossom'}, {k:'とり',r:'tori',e:'bird'}, {k:'くるま',r:'kuruma',e:'car'}, {k:'はる',r:'haru',e:'spring'}, {k:'れきし',r:'rekishi',e:'history'} ],
+  10:[ {k:'わたし',r:'watashi',e:'I / me'}, {k:'かわ',r:'kawa',e:'river'}, {k:'わに',r:'wani',e:'crocodile'} ],
+};
+
+const EXAMS = [
+  {id:'exam1', afterChapter:3, title:{en:'Exam 1', jp:'試験１'}, subtitle:{en:'Chapters 1–3', jp:'第１〜３章'}},
+  {id:'exam2', afterChapter:6, title:{en:'Exam 2', jp:'試験２'}, subtitle:{en:'Chapters 1–6', jp:'第１〜６章'}},
+  {id:'exam3', afterChapter:9, title:{en:'Exam 3', jp:'試験３'}, subtitle:{en:'Chapters 1–9', jp:'第１〜９章'}},
+  {id:'examFinal', afterChapter:10, title:{en:'Final Exam', jp:'修了試験'}, subtitle:{en:'All chapters', jp:'全章'}},
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const STORAGE_KEY = 'tenji_manabi_state_v1';
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { admin:true, basics:false, progress:{}, mode:'asing', examProgress:{} };
+}
+function saveState(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
+let state = loadState();
+if(!state.mode) state.mode = 'asing';
+if(!state.examProgress) state.examProgress = {};
+if(typeof state.basics !== 'boolean') state.basics = false;
+function isJP(){ return state.mode === 'jepang'; }
+function L(){ return isJP() ? 'jp' : 'en'; }
+function T(en, jp){ return isJP() ? jp : en; }
+function LX(o){ return o ? (o[L()] || '') : ''; }
+function chProg(id){
+  if(!state.progress[id]) state.progress[id] = {wajib:false, latihanBest:0};
+  return state.progress[id];
+}
+
+// router
+let route = {screen:'home'};
+const app = document.getElementById('app');
+
+function isUnlocked(chapterId){
+  if(state.admin) return true;
+  return prevGateDone(chapterId);
+}
+function prevGateDone(chapterId){
+  if(chapterId===1) return !!state.basics;
+  const examBefore = EXAMS.find(e=>e.afterChapter===chapterId-1);
+  if(examBefore) return isExamPassed(examBefore.id);
+  return !!chProg(chapterId-1).wajib;
+}
+function isExamPassed(examId){ return !!(state.examProgress[examId] && state.examProgress[examId].passed); }
+function isExamUnlocked(exam){
+  if(state.admin) return true;
+  return !!chProg(exam.afterChapter).wajib;
+}
+
+/* ============================================================
+   LEVEL 0: BASICS — how a braille cell works
+   ============================================================ */
+const BASICS = [
+  {
+    visual:[], numbered:true,
+    title:{en:'One cell, six dots', jp:'１マスは６つの点'},
+    body:{
+      en:'Japanese braille is written in a cell of six dots. The left column is dots 1, 2 and 3 from top to bottom, and the right column is dots 4, 5 and 6. Every single character is made by raising some of these six dots.',
+      jp:'点字は、６つの点でできた１つのマスで書きます。左の列が上から１・２・３の点、右の列が４・５・６の点です。この６点のうちいくつかを出すことで、すべての文字を表します。'}
+  },
+  {
+    visual:[{d:[1,2,4], cap:{en:'dots 1, 2, 4', jp:'１・２・４の点'}}, {op:'→'}, {d:[1], cap:{en:'あ  a', jp:'あ'}}],
+    title:{en:'The blue dots are the vowel', jp:'青い点は母音'},
+    body:{
+      en:'Dots 1, 2 and 4 are the vowel dots. On their own they decide whether the character sounds like a, i, u, e or o. あ is dot 1 alone, い is dots 1 and 2, う is dots 1 and 4. Five vowels, five small shapes.',
+      jp:'１・２・４の点は母音の点です。この３点だけで、あ・い・う・え・おのどの音かが決まります。「あ」は１の点だけ、「い」は１と２、「う」は１と４。母音は５つだけです。'}
+  },
+  {
+    visual:[{d:[3,5,6], cap:{en:'dots 3, 5, 6', jp:'３・５・６の点'}}],
+    title:{en:'The red dots are the consonant', jp:'赤い点は子音'},
+    body:{
+      en:'Dots 3, 5 and 6 are the consonant dots. They make no sound by themselves. They only tell you which consonant sits in front of the vowel: dot 6 alone means k, dot 3 alone means n, dots 5 and 6 together mean s.',
+      jp:'３・５・６の点は子音の点です。この点だけでは音になりません。母音の前にどの子音が付くかを表すだけです。６の点だけなら「か行」、３の点だけなら「な行」、５と６なら「さ行」です。'}
+  },
+  {
+    visual:[{d:[1], cap:{en:'あ  a', jp:'あ'}}, {op:'+'}, {d:[6], cap:{en:'k', jp:'か行の印'}}, {op:'='}, {d:[1,6], cap:{en:'か  ka', jp:'か'}}],
+    title:{en:'Put the two together', jp:'２つを組み合わせる'},
+    body:{
+      en:'A character is simply a vowel and a consonant marker sharing one cell. Take あ, the blue dot 1, add the k marker, the red dot 6, and you get か. The same marker on い gives き, on う gives く. Learn five vowels and a handful of markers, and the whole chart opens up.',
+      jp:'文字は、同じマスの中で母音と子音の印を合わせただけのものです。「あ」（青い１の点）に「か行」の印（赤い６の点）を足すと「か」になります。同じ印を「い」に足せば「き」、「う」に足せば「く」です。'}
+  },
+  {
+    visual:[],
+    emoji:'🎉',
+    title:{en:'You are ready', jp:'準備ができました'},
+    body:{
+      en:'That is the entire idea. Six dots: three for the vowel, three for the consonant. Everything from here is just learning which marker belongs to which row, and you already understand how the system thinks. That is the hard part, and you have done it. Chapter 1 is waiting.',
+      jp:'仕組みはこれだけです。６つの点のうち、３つが母音、３つが子音。ここから先は、どの印がどの行かを覚えるだけです。あなたはもう仕組みを理解しています。これが一番難しいところでした。第１章へ進みましょう。'}
+  },
+];
+
+function openBasics(idx){
+  const step = BASICS[idx];
+  const last = idx === BASICS.length - 1;
+  if(last && !state.basics){ state.basics = true; saveState(); }
+
+  let visual = '';
+  if(step.emoji){ visual += `<div class="big-emoji">${step.emoji}</div>`; }
+  if(step.numbered){
+    const order = [1,4,2,5,3,6];
+    visual += `<div class="lesson-item"><div class="cell big numbered">` +
+      order.map(pos=>`<div class="dotcell"><span style="animation-delay:${(pos-1)*0.42+0.25}s">${pos}</span></div>`).join('') +
+      `</div></div>`;
+  }
+  step.visual.forEach(v=>{
+    if(v.op){ visual += `<div class="lesson-op">${v.op}</div>`; return; }
+    visual += `<div class="lesson-item">${cellHTML(v.d,'colored','big')}${v.cap?`<div class="lesson-cap kana">${LX(v.cap)}</div>`:''}</div>`;
+  });
+
+  app.innerHTML = `
+    <div class="screen-head">
+      <button class="back-btn" id="backBtn">←</button>
+      <div>
+        <div class="screen-title">${T('Basics','きほん')}</div>
+        <div class="screen-sub">${T('How a braille cell works','点字の仕組み')}</div>
+      </div>
+    </div>
+    <div class="screen lesson-wrap">
+      <div class="lesson-dots">${BASICS.map((_,i)=>`<i class="${i===idx?'on':''}"></i>`).join('')}</div>
+      <div class="lesson-visual">${visual}</div>
+      <h2 class="${isJP()?'kana':''}">${LX(step.title)}</h2>
+      <p class="${isJP()?'kana':''}">${LX(step.body)}</p>
+      <div class="lesson-cta">
+        <button class="btn ${last?'btn-primary':''}" id="nextBtn" style="${last?'':'background:var(--ao);color:#fff;'}">${last? T('Back to map','マップに戻る') : T('Next','次へ')}</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('backBtn').onclick = renderHome;
+  document.getElementById('nextBtn').onclick = last ? renderHome : ()=>openBasics(idx+1);
+}
+
+/* ============================================================
+   RENDER: HOME
+   ============================================================ */
+function renderHome(){
+  closeModal();
+  const totalChars = CHAPTERS.reduce((s,c)=>s+c.chars.length,0);
+  let learnedChars = 0;
+  CHAPTERS.forEach(c=>{ if(chProg(c.id).wajib) learnedChars += c.chars.length; });
+
+  let html = `
+    <div class="topbar">
+      <div class="tagline ${isJP()?'kana':''}">${T('Learn to read Japanese braille — tenji','日本語の点字を読む練習')}</div>
+      <div class="spacer"></div>
+      <div class="admin-toggle ${state.admin?'on':''}" id="adminToggle"><span class="dot"></span>${T('Admin mode','管理者モード')}</div>
+    </div>
+    <div class="screen">
+      <div class="intro-card">
+        <div class="mode-select" style="margin-top:0;">
+          <div class="mode-btn ${state.mode==='asing'?'active':''}" id="modeAsing">
+            <div class="mb-emoji">🌏</div>
+            <div class="mb-label">English</div>
+            <div class="mb-sub">Romaji + meanings</div>
+          </div>
+          <div class="mode-btn ${state.mode==='jepang'?'active':''}" id="modeJepang">
+            <div class="mb-emoji">🇯🇵</div>
+            <div class="mb-label kana">日本語</div>
+            <div class="mb-sub kana">ローマ字なし</div>
+          </div>
+        </div>
+      </div>
+      <div class="path-wrap">
+        <div class="basic-row">
+          <div class="basic-node ${state.basics?'done':''}" id="basicNode">
+            <div class="basic-circle">${state.basics?'✓':'⊙'}</div>
+            <div class="basic-label">${T('Basics','きほん')}</div>
+            <div class="basic-sub">${T('How a braille cell works','点字の仕組み')}</div>
+          </div>
+        </div>
+        <div class="chart-card" id="chartCard">
+          <div class="mini"><i class="on"></i><i></i><i></i><i></i><i></i><i class="on"></i></div>
+          <div>
+            <div class="cc-title">${T('Full braille chart','点字一覧表')}</div>
+            <div class="cc-sub">${learnedChars} / ${totalChars} ${T('characters learned','文字学習づみ')}</div>
+          </div>
+          <div class="cc-go">›</div>
+        </div>
+  `;
+  CHAPTERS.forEach((c, idx)=>{
+    const unlocked = isUnlocked(c.id);
+    const prog = chProg(c.id);
+    const stateCls = !unlocked ? 'locked-ch' : (prog.wajib ? 'learned' : 'todo');
+    html += `<div class="chapter-block ${stateCls}">
+      <div class="chapter-head">
+        <div class="chapter-rule"></div>
+        <div class="row">
+          <div>
+            <div class="num">${T('CHAPTER '+c.id+' · '+c.romajiName, '第'+c.id+'章')}${c.special?`<span class="special-badge">${T('✨ Special pattern','✨ 特別な形')}</span>`:''}</div>
+            <div class="name kana">${c.kana} ${c.chars.map(x=>x.k).join('')}</div>
+          </div>
+          <div class="ch-state">${unlocked? (prog.wajib?'✓':'') : '🔒'}</div>
+        </div>
+      </div>
+      <div class="node-row">
+        <div class="node wajib ${prog.wajib?'done':''} ${unlocked?'':'locked'}" data-action="wajib" data-ch="${c.id}">
+          <div class="node-circle">${prog.wajib? '✓' : '📘'}</div>
+          <div class="node-label">${T('Learn','学習')}<br>${T('(required)','（必修）')}</div>
+        </div>
+        <div class="node latihan ${unlocked?'':'locked'}" data-action="latihan" data-ch="${c.id}">
+          <div class="node-circle">🏋️${prog.latihanBest?`<div class="node-star">${prog.latihanBest}</div>`:''}</div>
+          <div class="node-label">${T('Practice','練習')}<br>${T('(optional)','（任意）')}</div>
+        </div>
+      </div>
+    </div>`;
+    const exam = EXAMS.find(e=>e.afterChapter===c.id);
+    if(exam){
+      const examUnlocked = isExamUnlocked(exam);
+      const examDone = isExamPassed(exam.id);
+      html += `<div class="exam-row ${examUnlocked?'':'locked-ex'}">
+        <div class="exam-node ${examDone?'done':''} ${examUnlocked?'':'locked'}" data-exam="${exam.id}">
+          <div class="exam-circle">${examDone?'🏆':'📜'}</div>
+          <div class="exam-label">${LX(exam.title)}</div>
+          <div class="exam-sub">${LX(exam.subtitle)}</div>
+        </div>
+      </div>`;
+    }
+  });
+  html += `</div></div>`;
+  app.innerHTML = html;
+
+  document.getElementById('adminToggle').onclick = ()=>{ state.admin = !state.admin; saveState(); renderHome(); };
+  document.getElementById('basicNode').onclick = ()=> openBasics(0);
+  document.getElementById('chartCard').onclick = showFullChart;
+  document.getElementById('modeAsing').onclick = ()=>{ state.mode='asing'; saveState(); renderHome(); };
+  document.getElementById('modeJepang').onclick = ()=>{ state.mode='jepang'; saveState(); renderHome(); };
+  document.querySelectorAll('.node').forEach(node=>{
+    node.onclick = ()=>{
+      const ch = parseInt(node.dataset.ch);
+      if(!isUnlocked(ch)) { shake(node); return; }
+      if(node.dataset.action==='wajib') openWajibIntro(ch);
+      else openLatihanIntro(ch);
+    };
+  });
+  document.querySelectorAll('.exam-node').forEach(node=>{
+    node.onclick = ()=>{
+      const examId = node.dataset.exam;
+      const exam = EXAMS.find(e=>e.id===examId);
+      if(!isExamUnlocked(exam)) { shake(node); return; }
+      startExam(exam);
+    };
+  });
+}
+function shake(el){
+  el.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], {duration:280});
+}
+
+/* ============================================================
+   BRAILLE CELL RENDERER
+   ============================================================ */
+function cellHTML(dots, mode, size){ // mode: 'colored' | 'black'
+  // grid order visually: col1 top-bottom (1,2,3), col2 top-bottom (4,5,6)
+  const order = [1,4,2,5,3,6];
+  const cls = size==='big'?'cell big':'cell';
+  let html = `<div class="${cls}">`;
+  order.forEach(pos=>{
+    const active = dots.includes(pos);
+    let c = 'dotcell';
+    if(active){
+      if(mode==='black') c+=' on-black';
+      else c += (pos===1||pos===2||pos===4) ? ' on-vowel' : ' on-consonant';
+    }
+    html += `<div class="${c}"></div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+/* ============================================================
+   WAJIB: INTRO / MATERI
+   ============================================================ */
+function dotBreakdown(ch, c){
+  // ya-gyo and wa-gyo are built by shifting the vowel shape, so the
+  // plain vowel/consonant split would be misleading there.
+  if(c && (c.id===8 || c.id===10)){
+    const txt = c.id===8
+      ? T('shifted vowel shape + dot 4','ずらした母音の形＋４の点')
+      : T('shifted vowel shape, no consonant dot','ずらした母音の形だけ、子音の点なし');
+    return `<div class="dot-breakdown"><div class="db-item ${isJP()?'kana':''}"><i style="background:var(--gold)"></i>${txt}</div></div>`;
+  }
+  const vd = ch.d.filter(d=>[1,2,4].includes(d));
+  const cd = ch.d.filter(d=>[3,5,6].includes(d));
+  const none = T('none','なし');
+  return `<div class="dot-breakdown">
+    <div class="db-item"><i style="background:var(--ao)"></i>${T('vowel','母音')}: ${vd.length? vd.join(', ') : none}</div>
+    <div class="db-item"><i style="background:var(--shu)"></i>${T('consonant','子音')}: ${cd.length? cd.join(', ') : none}</div>
+  </div>`;
+}
+
+function openWajibIntro(chId, step){
+  const c = CHAPTERS.find(x=>x.id===chId);
+  step = step || 0;
+  const n = c.chars.length;
+  route = {screen:'wajib-intro', ch:chId, step:step};
+  const total = n + 1;
+  const dots = Array.from({length:total}, (_,i)=>`<i class="${i===step?'on':''}"></i>`).join('');
+  const noteBox = c.note
+    ? `<div class="note-box ${isJP()?'kana':''}">${c.special?'✨ ':''}<b>${c.special? T('Special pattern: ','特別な形：') : T('Note: ','メモ：')}</b>${LX(c.note)}</div>`
+    : '';
+
+  const head = `
+    <div class="screen-head">
+      <button class="back-btn" id="backBtn">←</button>
+      <div>
+        <div class="screen-title kana">${c.kana} — ${T('Learn','学習')}</div>
+        <div class="screen-sub">${step < n ? `${step+1} / ${total}` : T('All together','すべてまとめて')}</div>
+      </div>
+    </div>`;
+
+  if(step < n){
+    const ch = c.chars[step];
+    app.innerHTML = `
+      ${head}
+      <div class="screen">
+        ${step===0 ? noteBox : ''}
+        <div class="mat-step">
+          <div class="lesson-dots">${dots}</div>
+          ${cellHTML(ch.d,'colored','big')}
+          <div class="step-kana kana">${ch.k}</div>
+          ${isJP() ? '' : `<div class="step-romaji">${ch.r}</div>`}
+          ${dotBreakdown(ch, c)}
+          <p style="font-size:13px;color:var(--ink-soft);margin-top:18px;max-width:300px;line-height:1.7;" class="${isJP()?'kana':''}">
+            ${T('Dots: ','点：')}${ch.d.join(', ')}
+          </p>
+        </div>
+        <div class="cta-row">
+          <button class="btn btn-primary" id="nextBtn">${T('Next','次へ')}</button>
+        </div>
+      </div>`;
+    document.getElementById('backBtn').onclick = ()=> step===0 ? renderHome() : openWajibIntro(chId, step-1);
+    document.getElementById('nextBtn').onclick = ()=> openWajibIntro(chId, step+1);
+    return;
+  }
+
+  let list = '';
+  c.chars.forEach(ch=>{
+    list += `<div class="mat-row">
+      ${cellHTML(ch.d,'colored')}
+      <div class="mat-info">
+        <div class="mat-kana kana">${ch.k}</div>
+      </div>
+      <div style="flex:1">
+        ${isJP() ? '' : `<div class="mat-romaji">${ch.r}</div>`}
+        <div class="mat-desc">${T('Dots: ','点：')}${ch.d.join(', ')}</div>
+      </div>
+    </div>`;
+  });
+  app.innerHTML = `
+    ${head}
+    <div class="screen">
+      <div class="lesson-dots" style="justify-content:center;display:flex;margin:16px auto 0;">${dots}</div>
+      <div style="text-align:center;padding:14px 22px 0;">
+        <h2 style="font-size:19px;margin:0 0 6px;" class="${isJP()?'kana':''}">${T('The whole row at a glance','この行をまとめて見る')}</h2>
+        <p style="font-size:13px;color:var(--ink-soft);margin:0;line-height:1.7;" class="${isJP()?'kana':''}">${LX(c.desc)}</p>
+      </div>
+      <div class="material-list">${list}</div>
+      <div class="cta-row">
+        <button class="link-btn" style="display:block;text-align:center;margin-bottom:10px;" id="tableBtnFree">📖 ${T('Open the chart (free, unlimited)','一覧表を見る（自由・回数制限なし）')}</button>
+        <button class="btn btn-primary" id="startQuiz">${T('Start the required quiz','必修クイズを始める')}</button>
+      </div>
+    </div>`;
+  document.getElementById('backBtn').onclick = ()=> openWajibIntro(chId, n-1);
+  document.getElementById('startQuiz').onclick = ()=> startWajibQuiz(chId);
+  document.getElementById('tableBtnFree').onclick = ()=> showTableModal(c.chars, 'colored');
+}
+
+/* ============================================================
+   WAJIB QUIZ
+   ============================================================ */
+function buildDistractors(pool, correct, n, keyFn){
+  const others = pool.filter(x=>keyFn(x)!==keyFn(correct));
+  shuffleArr(others);
+  return others.slice(0,n);
+}
+function shuffleArr(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function startWajibQuiz(chId){
+  const c = CHAPTERS.find(x=>x.id===chId);
+  const cumulativePool = CHAPTERS.filter(x=>x.id<=chId).flatMap(x=>x.chars); // wider distractor pool; the questions themselves stay within this chapter
+  const questions = [];
+  const chars = shuffleArr([...c.chars]);
+  chars.forEach(ch=>{
+    const type = Math.random()<0.5 ? 'read' : 'match';
+    questions.push({type, ch});
+  });
+  // duplikasi ringan biar minimal 6 soal
+  while(questions.length < 6){
+    const ch = c.chars[Math.floor(Math.random()*c.chars.length)];
+    questions.push({type: Math.random()<0.5?'read':'match', ch});
+  }
+  runWajibQuestion(chId, questions, 0, 0, cumulativePool, c);
+}
+
+function runWajibQuestion(chId, questions, idx, correctCount, pool, c){
+  if(idx >= questions.length){ return wajibResult(chId, correctCount, questions.length); }
+  const q = questions[idx];
+  const progressPct = Math.round((idx/questions.length)*100);
+  let bodyHtml = '';
+  let optionsHtml = '';
+  const distract = buildDistractors(c.chars, q.ch, 3, x=>x.k);
+  const opts = shuffleArr([q.ch, ...distract]);
+
+  if(q.type==='read'){
+    bodyHtml = `<div class="quiz-prompt">${T('What does this braille say?','この点字は何と読みますか。')}</div>
+      <div class="quiz-focus"><div class="braille-seq">${cellHTML(q.ch.d,'colored','big')}</div></div>`;
+    opts.forEach(o=>{
+      const label = `<span class="opt-main"><span class="opt-kana kana">${o.k}</span>${isJP()?'':`<span class="opt-romaji">${o.r}</span>`}</span>`;
+      optionsHtml += `<button class="opt-btn" data-correct="${o.k===q.ch.k}">${label}</button>`;
+    });
+  } else {
+    bodyHtml = `<div class="quiz-prompt">${T('Choose the correct dot pattern for:','正しい点の形を選んでください。')}</div>
+      <div class="quiz-focus"><div class="big-kana kana">${q.ch.k}</div></div>`;
+    opts.forEach(o=>{
+      optionsHtml += `<button class="opt-btn" data-correct="${o.k===q.ch.k}">${cellHTML(o.d,'colored')}</button>`;
+    });
+  }
+
+  app.innerHTML = `
+    <div class="screen-head">
+      <button class="back-btn" id="quitBtn">✕</button>
+      <div class="progress-bar"><div style="width:${progressPct}%"></div></div>
+      <div style="font-size:12px;font-weight:800;color:var(--ink-soft)">${idx+1}/${questions.length}</div>
+    </div>
+    <div class="screen quiz-wrap">
+      ${bodyHtml}
+      <div class="options">${optionsHtml}</div>
+      <button class="link-btn" style="margin-top:14px;" id="tableBtnFree">📖 ${T('Open the chart (free)','一覧表を見る（自由）')}</button>
+    </div>
+  `;
+  document.getElementById('quitBtn').onclick = ()=> askConfirm(T('Leave the quiz? Your progress in this chapter will be lost.','クイズをやめますか。この章の記録は消えます。'), renderHome);
+  document.getElementById('tableBtnFree').onclick = ()=>showTableModal(c.chars, 'colored');
+  document.querySelectorAll('.opt-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      document.querySelectorAll('.opt-btn').forEach(b=>b.disabled=true);
+      const ok = btn.dataset.correct==='true';
+      btn.classList.add(ok?'correct':'wrong');
+      if(!ok){
+        document.querySelectorAll('.opt-btn').forEach(b=>{ if(b.dataset.correct==='true') b.classList.add('correct'); });
+      }
+      const fb = document.createElement('div');
+      fb.className = 'feedback-bar ' + (ok?'ok':'bad');
+      const answerLabel = isJP() ? `<b class="kana">${q.ch.k}</b>` : `<b>${q.ch.r} (${q.ch.k})</b>`;
+      fb.innerHTML = `<div class="fb-title">${ok? T('✓ Correct!','✓ 正解！') : T('✕ Not quite','✕ 残念')}</div>
+        ${ok?'':`<div style="font-size:13px;margin-bottom:10px;">${T('Correct answer:','正解：')} ${answerLabel}</div>`}
+        <button class="btn ${ok?'btn-primary':'btn-secondary'}" id="nextBtn">${T('Continue','次へ')}</button>`;
+      document.querySelector('.quiz-wrap').appendChild(fb);
+      fb.scrollIntoView({behavior:'smooth', block:'end'});
+      document.getElementById('nextBtn').onclick = ()=> runWajibQuestion(chId, questions, idx+1, correctCount+(ok?1:0), pool, c);
+    };
+  });
+}
+
+function wajibResult(chId, correct, total){
+  const pass = correct/total >= 0.6;
+  if(pass){ chProg(chId).wajib = true; saveState(); }
+  app.innerHTML = `
+    <div class="screen center-screen">
+      <div class="emoji">${pass?'🎉':'😅'}</div>
+      <h2 class="${isJP()?'kana':''}">${pass? T('Chapter complete!','章クリア！') : T('Not passed yet','不合格')}</h2>
+      <p class="${isJP()?'kana':''}">${pass? T('You have unlocked new characters. Move on to the next chapter, or try the Practice level to make them stick.','新しい文字を覚えました。次の章へ進むか、練習レベルで記憶を固めましょう。') : T('Your score is not high enough to unlock the next chapter yet. Go through the material once more and try again.','次の章を開くには点数が足りません。もう一度学習してから挑戦しましょう。')}</p>
+      <div class="result-stats">
+        <div class="result-stat"><div class="n">${correct}/${total}</div><div class="l">${T('Correct','正解')}</div></div>
+        <div class="result-stat"><div class="n">${Math.round(correct/total*100)}%</div><div class="l">${T('Accuracy','正答率')}</div></div>
+      </div>
+      <button class="btn btn-primary" style="max-width:280px" id="doneBtn">${pass? T('Back to map','マップに戻る') : T('Try again','もう一度')}</button>
+    </div>
+  `;
+  document.getElementById('doneBtn').onclick = pass ? renderHome : ()=>openWajibIntro(chId);
+}
+
+/* ============================================================
+   PRACTICE (optional, uses hearts, plain black dots)
+   ============================================================ */
+function openLatihanIntro(chId){
+  const c = CHAPTERS.find(x=>x.id===chId);
+  const words = WORDS[chId] || [];
+  app.innerHTML = `
+    <div class="screen-head">
+      <button class="back-btn" id="backBtn">←</button>
+      <div>
+        <div class="screen-title kana">${c.kana} — ${T('Practice','練習')}</div>
+        <div class="screen-sub">${T('Optional level, to make the shapes stick','記憶を固めるための任意レベル')}</div>
+      </div>
+    </div>
+    <div class="screen">
+      <div class="intro-card">
+        <p class="${isJP()?'kana':''}">${T('You will read whole words in plain black braille, with no colour to help you. You have <b>5 hearts ❤️</b>. A wrong answer, or opening the chart, costs one heart. This level is <b>optional</b>.','色のヒントなしの黒い点字で単語を読みます。ハートは<b>５つ ❤️</b>です。まちがえるか一覧表を開くと１つ減ります。このレベルは<b>任意</b>です。')}</p>
+      </div>
+      <div class="cta-row">
+        <button class="btn btn-gold" id="startBtn" ${words.length? '' : 'disabled'}>${T('Start practice','練習を始める')} ❤️❤️❤️❤️❤️</button>
+        <p style="text-align:center;color:var(--ink-soft);font-size:12px;margin-top:8px;">${words.length? '' : T('No vocabulary for this chapter yet.','この章の単語はまだありません。')}</p>
+      </div>
+    </div>
+  `;
+  document.getElementById('backBtn').onclick = renderHome;
+  if(words.length) document.getElementById('startBtn').onclick = ()=>startLatihan(chId);
+}
+
+function startLatihan(chId){
+  const pool = [];
+  for(let i=1;i<=chId;i++){ if(WORDS[i]) pool.push(...WORDS[i]); }
+  const questions = shuffleArr([...pool]);
+  while(questions.length < 8){ questions.push(pool[Math.floor(Math.random()*pool.length)]); }
+  runLatihanQuestion(chId, questions.slice(0,8), 0, 5, 0, pool);
+}
+
+function learnedCharsUpTo(chId){
+  const list = [];
+  for(let i=1;i<=chId;i++){ const c = CHAPTERS.find(x=>x.id===i); if(c) list.push(...c.chars); }
+  return list;
+}
+
+function runLatihanQuestion(chId, questions, idx, hearts, correctCount, pool){
+  if(hearts<=0){ return latihanResult(chId, correctCount, idx, false); }
+  if(idx >= questions.length){ return latihanResult(chId, correctCount, questions.length, true); }
+  const q = questions[idx];
+  const distract = buildDistractors(pool, q, 3, x=>x.k);
+  const opts = shuffleArr([q, ...distract]);
+
+  let seqHtml = '';
+  [...q.k].forEach(ch=>{
+    // cari kana ini di seluruh chapter s.d chId
+    let found = null;
+    for(let i=1;i<=chId && !found;i++){ const c = CHAPTERS.find(x=>x.id===i); if(c) found = c.chars.find(x=>x.k===ch); }
+    if(found) seqHtml += `<div class="cell-inline">${cellHTML(found.d,'black')}</div>`;
+  });
+
+  app.innerHTML = `
+    <div class="screen-head">
+      <button class="back-btn" id="quitBtn">✕</button>
+      <div class="progress-bar"><div style="width:${Math.round((idx/questions.length)*100)}%"></div></div>
+      <div class="hearts">${'❤️'.repeat(hearts)}${'🖤'.repeat(5-hearts)}</div>
+    </div>
+    <div class="screen quiz-wrap">
+      <div class="quiz-prompt">${T('What word is this, and what does it mean?','この単語は何と読みますか。')}</div>
+      <div class="quiz-focus"><div class="braille-seq">${seqHtml}</div></div>
+      <div class="options" id="optsWrap">
+        ${opts.map(o=> `<button class="opt-btn" data-correct="${o.k===q.k}"><span class="opt-main"><span class="opt-kana kana">${o.k}</span>${isJP()?'':`<span class="opt-romaji">${o.r}</span><span class="opt-mean hide">${o.e}</span>`}</span></button>`).join('')}
+      </div>
+      <button class="link-btn" style="margin-top:14px;" id="tableBtn">📖 ${T('Open the chart','一覧表を見る')} (−1 ❤️)</button>
+    </div>
+  `;
+  document.getElementById('quitBtn').onclick = ()=> askConfirm(T('Leave the practice? Nothing is locked by this level.','練習をやめますか。このレベルで何かが閉ざされることはありません。'), renderHome);
+  document.getElementById('tableBtn').onclick = ()=>{
+    if(hearts<=1){ 
+      hearts = 0; saveState();
+      closeModal();
+      return latihanResult(chId, correctCount, idx, false);
+    }
+    hearts -= 1;
+    const hEl = document.querySelector('.hearts');
+    if(hEl) hEl.innerHTML = '❤️'.repeat(hearts) + '🖤'.repeat(5-hearts);
+    showTableModal(learnedCharsUpTo(chId), 'black');
+  };
+  document.querySelectorAll('#optsWrap .opt-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      document.querySelectorAll('#optsWrap .opt-btn').forEach(b=>b.disabled=true);
+      document.querySelectorAll('.opt-mean').forEach(e=>e.classList.remove('hide'));
+      const ok = btn.dataset.correct==='true';
+      let newHearts = hearts;
+      btn.classList.add(ok?'correct':'wrong');
+      if(!ok){
+        newHearts -= 1;
+        document.querySelectorAll('#optsWrap .opt-btn').forEach(b=>{ if(b.dataset.correct==='true') b.classList.add('correct'); });
+      }
+      const fb = document.createElement('div');
+      fb.className = 'feedback-bar ' + (ok?'ok':'bad');
+      const answerDetail = isJP()
+        ? `<div style="font-size:13px;margin-bottom:10px;">${T('Correct answer:','正解：')} <b class="kana">${q.k}</b></div>`
+        : `<div style="font-size:13px;margin-bottom:10px;">${T('Correct answer:','正解：')} <b>${q.r}</b> — <i>${q.e}</i></div>`;
+      fb.innerHTML = `<div class="fb-title">${ok? T('✓ Correct!','✓ 正解！') : T('✕ Not quite (−1 ❤️)','✕ 残念（−1 ❤️）')}</div>
+        ${ok?'': answerDetail}
+        <button class="btn ${ok?'btn-primary':'btn-secondary'}" id="nextBtn">${T('Continue','次へ')}</button>`;
+      document.querySelector('.quiz-wrap').appendChild(fb);
+      fb.scrollIntoView({behavior:'smooth', block:'end'});
+      document.getElementById('nextBtn').onclick = ()=> runLatihanQuestion(chId, questions, idx+1, newHearts, correctCount+(ok?1:0), pool);
+    };
+  });
+}
+
+function askConfirm(msg, onYes){
+  closeModal();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay center';
+  overlay.innerHTML = `
+    <div class="confirm-sheet">
+      <p class="${isJP()?'kana':''}">${msg}</p>
+      <div class="confirm-btns">
+        <button class="btn btn-secondary" id="cNo">${T('Stay','つづける')}</button>
+        <button class="btn" id="cYes" style="background:var(--shu);color:#fff;">${T('Leave','やめる')}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#cNo').onclick = ()=> overlay.remove();
+  overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+  overlay.querySelector('#cYes').onclick = ()=>{ overlay.remove(); onYes(); };
+}
+
+function showFullChart(){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  let body = '';
+  CHAPTERS.forEach(c=>{
+    const learned = !!chProg(c.id).wajib;
+    body += `<div class="chart-group">
+      <h4><span class="kana">${c.kana}</span>${isJP()?'':' · '+c.romajiName}</h4>
+      <div class="chart-row">` +
+      c.chars.map(ch=>`<div class="chart-cell ${learned?'':'dim'}">
+          ${cellHTML(ch.d,'black')}
+          <div class="k kana">${ch.k}</div>
+          ${isJP()?'':`<div class="r">${ch.r}</div>`}
+        </div>`).join('') +
+      `</div></div>`;
+  });
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3>${T('Full braille chart','点字一覧表')}</h3>
+        <button class="close-x" id="closeModal">✕</button>
+      </div>
+      <div class="chart-legend">
+        <span><b></b>${T('learned','学習づみ')}</span>
+        <span><b class="faded"></b>${T('not learned yet','まだ')}</span>
+      </div>
+      ${body}
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('closeModal').onclick = closeModal;
+  overlay.onclick = (e)=>{ if(e.target===overlay) closeModal(); };
+}
+
+function showTableModal(chars, mode){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-head"><h3>${T('Characters you have learned','学んだ文字の一覧')}</h3><button class="close-x" id="closeModal">✕</button></div>
+      <div class="table-grid">
+        ${chars.map(c=>`<div class="table-cell">${cellHTML(c.d, mode)}<div class="kana">${c.k}</div>${isJP()?'':`<div class="romaji">${c.r}</div>`}</div>`).join('')}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('closeModal').onclick = closeModal;
+  overlay.onclick = (e)=>{ if(e.target===overlay) closeModal(); };
+}
+function closeModal(){ document.querySelectorAll('.modal-overlay').forEach(m=>m.remove()); }
+
+function latihanResult(chId, correct, total, finished){
+  const best = Math.max(chProg(chId).latihanBest||0, correct);
+  chProg(chId).latihanBest = best; saveState();
+  app.innerHTML = `
+    <div class="screen center-screen">
+      <div class="emoji">${finished? (correct>=6?'🌟':'👍') : '💔'}</div>
+      <h2 class="${isJP()?'kana':''}">${finished? T('Practice complete','練習おわり') : T('Out of hearts','ハートがなくなりました')}</h2>
+      <p class="${isJP()?'kana':''}">${finished? T('Nicely done. This level is optional, but it is the fastest way to make the shapes automatic.','よくできました。このレベルは任意ですが、形を覚えるのに一番です。') : T('Your hearts ran out. Come back whenever you like; nothing is locked by this level.','ハートがなくなりました。いつでもやり直せます。このレベルで何かが閉ざされることはありません。')}</p>
+      <div class="result-stats">
+        <div class="result-stat"><div class="n">${correct}</div><div class="l">${T('Correct','正解')}</div></div>
+        <div class="result-stat"><div class="n">${total}</div><div class="l">${T('Attempted','解いた問題')}</div></div>
+      </div>
+      <button class="btn btn-gold" style="max-width:280px" id="doneBtn">${T('Back to map','マップに戻る')}</button>
+    </div>
+  `;
+  document.getElementById('doneBtn').onclick = renderHome;
+}
+
+/* ============================================================
+   EXAM (straight to the quiz, no material or chart, covering every
+   character learned up to the given chapter)
+   ============================================================ */
+function startExam(exam){
+  const pool = CHAPTERS.filter(c=>c.id<=exam.afterChapter).flatMap(c=>c.chars);
+  const total = Math.min(12, Math.max(8, pool.length));
+  const questions = [];
+  const shuffled = shuffleArr([...pool]);
+  for(let i=0;i<total;i++){
+    const ch = shuffled[i % shuffled.length];
+    questions.push({type: Math.random()<0.5?'read':'match', ch});
+  }
+  runExamQuestion(exam, questions, 0, 0, pool);
+}
+
+function runExamQuestion(exam, questions, idx, correctCount, pool){
+  if(idx >= questions.length){ return examResult(exam, correctCount, questions.length); }
+  const q = questions[idx];
+  const distract = buildDistractors(pool, q.ch, 3, x=>x.k);
+  const opts = shuffleArr([q.ch, ...distract]);
+  let bodyHtml = '';
+  let optionsHtml = '';
+
+  if(q.type==='read'){
+    bodyHtml = `<div class="quiz-prompt">${T('What does this braille say?','この点字は何と読みますか。')}</div>
+      <div class="quiz-focus"><div class="braille-seq">${cellHTML(q.ch.d,'black','big')}</div></div>`;
+    opts.forEach(o=>{
+      const label = `<span class="opt-main"><span class="opt-kana kana">${o.k}</span>${isJP()?'':`<span class="opt-romaji">${o.r}</span>`}</span>`;
+      optionsHtml += `<button class="opt-btn" data-correct="${o.k===q.ch.k}">${label}</button>`;
+    });
+  } else {
+    bodyHtml = `<div class="quiz-prompt">${T('Choose the correct dot pattern for:','正しい点の形を選んでください。')}</div>
+      <div class="quiz-focus"><div class="big-kana kana">${q.ch.k}</div></div>`;
+    opts.forEach(o=>{
+      optionsHtml += `<button class="opt-btn" data-correct="${o.k===q.ch.k}">${cellHTML(o.d,'black')}</button>`;
+    });
+  }
+
+  app.innerHTML = `
+    <div class="screen-head">
+      <button class="back-btn" id="quitBtn">✕</button>
+      <div class="progress-bar"><div style="width:${Math.round((idx/questions.length)*100)}%; background:var(--purple);"></div></div>
+      <div style="font-size:12px;font-weight:800;color:var(--ink-soft)">${idx+1}/${questions.length}</div>
+    </div>
+    <div class="screen quiz-wrap">
+      ${bodyHtml}
+      <div class="options">${optionsHtml}</div>
+    </div>
+  `;
+  document.getElementById('quitBtn').onclick = ()=> askConfirm(T('Leave the exam? Your progress in it will be lost.','試験をやめますか。この試験の記録は消えます。'), renderHome);
+  document.querySelectorAll('.opt-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      document.querySelectorAll('.opt-btn').forEach(b=>b.disabled=true);
+      const ok = btn.dataset.correct==='true';
+      btn.classList.add(ok?'correct':'wrong');
+      if(!ok){
+        document.querySelectorAll('.opt-btn').forEach(b=>{ if(b.dataset.correct==='true') b.classList.add('correct'); });
+      }
+      const answerLabel = isJP() ? `<b class="kana">${q.ch.k}</b>` : `<b>${q.ch.r} (${q.ch.k})</b>`;
+      const fb = document.createElement('div');
+      fb.className = 'feedback-bar ' + (ok?'ok':'bad');
+      fb.innerHTML = `<div class="fb-title">${ok? T('✓ Correct!','✓ 正解！') : T('✕ Not quite','✕ 残念')}</div>
+        ${ok?'':`<div style="font-size:13px;margin-bottom:10px;">${T('Correct answer:','正解：')} ${answerLabel}</div>`}
+        <button class="btn ${ok?'btn-primary':'btn-secondary'}" id="nextBtn" style="${ok?'':'background:var(--purple);color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.15);'}">${T('Continue','次へ')}</button>`;
+      document.querySelector('.quiz-wrap').appendChild(fb);
+      fb.scrollIntoView({behavior:'smooth', block:'end'});
+      document.getElementById('nextBtn').onclick = ()=> runExamQuestion(exam, questions, idx+1, correctCount+(ok?1:0), pool);
+    };
+  });
+}
+
+function examResult(exam, correct, total){
+  const pass = correct/total >= 0.7;
+  if(pass){ state.examProgress[exam.id] = {passed:true, best: Math.max((state.examProgress[exam.id]&&state.examProgress[exam.id].best)||0, correct)}; saveState(); }
+  app.innerHTML = `
+    <div class="screen center-screen">
+      <div class="emoji">${pass?'🏆':'📜'}</div>
+      <h2 class="${isJP()?'kana':''}">${pass? T(LX(exam.title)+' passed!', LX(exam.title)+' 合格！') : T('Not passed','不合格')}</h2>
+      <p class="${isJP()?'kana':''}">${pass? T('Well done. You have the characters up to this point under control and can move on to the next chapter.','よくできました。ここまでの文字をしっかり覚えています。次の章へ進めます。') : T('You need at least 70% to pass. Review the earlier chapters and take the exam again.','合格には70％以上必要です。前の章を復習してからもう一度受けましょう。')}</p>
+      <div class="result-stats">
+        <div class="result-stat"><div class="n">${correct}/${total}</div><div class="l">${T('Correct','正解')}</div></div>
+        <div class="result-stat"><div class="n">${Math.round(correct/total*100)}%</div><div class="l">${T('Accuracy','正答率')}</div></div>
+      </div>
+      <button class="btn" style="max-width:280px; background:var(--purple); color:#fff;" id="doneBtn">${pass? T('Back to map','マップに戻る') : T('Try again','もう一度')}</button>
+    </div>
+  `;
+  document.getElementById('doneBtn').onclick = pass ? renderHome : ()=>startExam(exam);
+}
+
+renderHome();
+</script>
+</body>
+</html>
